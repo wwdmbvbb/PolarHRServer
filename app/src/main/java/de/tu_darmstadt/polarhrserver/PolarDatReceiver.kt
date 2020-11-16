@@ -13,44 +13,31 @@ import kotlin.reflect.KFunction0
 object PolarDatReceiver {
     private var api: PolarBleApi? = null
 
-    //TODO: figure out settings
-    private var ecgSettings: PolarSensorSetting = PolarSensorSetting(
-        mapOf(
-            PolarSensorSetting.SettingType.SAMPLE_RATE to 100,
-            PolarSensorSetting.SettingType.RANGE to 2,
-            PolarSensorSetting.SettingType.RESOLUTION to 1
-        )
-    );
-    private var accSettings: PolarSensorSetting = PolarSensorSetting(
-        mapOf(
-            PolarSensorSetting.SettingType.SAMPLE_RATE to 100,
-            PolarSensorSetting.SettingType.RANGE to 2,
-            PolarSensorSetting.SettingType.RESOLUTION to 1
-        )
-    );
-
     private var ecgSubscription: Disposable? = null
     private var accSubscription: Disposable? = null
 
     private var onEcgData: ((PolarEcgData) -> Unit)? = null
     private var onAccData: ((PolarAccelerometerData) -> Unit)? = null
+    private var onHrData: ((PolarHrData) -> Unit)? = null
 
     private var onConnected: ((String) -> Unit)? = null
     private var onDisconnected: ((String) -> Unit)? = null
     private var onConnecting: ((String) -> Unit)? = null
 
     fun init(
-        onEcgData: ((PolarEcgData) -> Unit),
-        onAccData: ((PolarAccelerometerData) -> Unit),
-        onConnected: ((String) -> Unit),
-        onDisconnected: ((String) -> Unit)?,
-        onConnecting: ((String) -> Unit)
+        onEcgData: (PolarEcgData) -> Unit,
+        onAccData: (PolarAccelerometerData) -> Unit,
+        onConnected: (String) -> Unit,
+        onDisconnected: (String) -> Unit,
+        onConnecting: (String) -> Unit,
+        onHrData: (PolarHrData) -> Unit
     ) {
         this.onEcgData = onEcgData
         this.onAccData = onAccData
         this.onConnected = onConnected
         this.onDisconnected = onDisconnected
         this.onConnecting = onConnecting
+        this.onHrData = onHrData
     }
 
     fun connect(context: Context) {
@@ -78,21 +65,27 @@ object PolarDatReceiver {
 
     }
 
-    private fun onEcgReady(identifier: String) = api?.let {
-        val ecgFlowable = it.startEcgStreaming(identifier, ecgSettings)
+    private fun onEcgReady(identifier: String) {
+        if (api == null) return;
+        val ecgSettings = api!!.requestEcgSettings(DEVICE_ID).blockingGet().maxSettings(); //TODO: let user choose
+        val ecgFlowable = api!!.startEcgStreaming(identifier, ecgSettings)
         if (onEcgData != null) {
             ecgSubscription = ecgFlowable.subscribe(
                 onEcgData,
-                { Log.e(LOG_TAG, "Error while receiving ECG: ${it.message}") }) //TODO: onError
+                { //Log.e(LOG_TAG, "Error while receiving ECG: ${it}")
+                    throw it }) //TODO: onError
         }
     }
 
-    private fun onAccReady(identifier: String) = api?.let {
-        val accFlowable = it.startAccStreaming(identifier, accSettings)
+    private fun onAccReady(identifier: String) {
+        if (api == null) return;
+        val accSettings = api!!.requestAccSettings(DEVICE_ID).blockingGet().maxSettings(); //TODO: let user choose
+        val accFlowable = api!!.startAccStreaming(identifier, accSettings)
         if (onAccData != null) {
             accSubscription = accFlowable.subscribe(
                 onAccData,
-                { Log.e(LOG_TAG, "Error while receiving ACC: ${it.message}") }) //TODO: onError
+                { //Log.e(LOG_TAG, "Error while receiving ACC: ${it}")
+                    throw it }) //TODO: onError
         }
     }
 
@@ -101,6 +94,7 @@ object PolarDatReceiver {
             LOG_TAG,
             "HR Data received, HR: ${data.hr}, Connect Status (supported): ${data.contactStatus}(${data.contactStatusSupported}), RRS: ${if (data.rrAvailable) data.rrs else null}"
         )
+        onHrData?.let { it(data) }
     }
 
     private fun onConnected(polarDeviceInfo: PolarDeviceInfo) {
@@ -108,6 +102,8 @@ object PolarDatReceiver {
     }
 
     private fun onDisconnected(polarDeviceInfo: PolarDeviceInfo) {
+        accSubscription?.dispose()
+        ecgSubscription?.dispose()
         onDisconnected?.let { it(polarDeviceInfo.deviceId) }
     }
 

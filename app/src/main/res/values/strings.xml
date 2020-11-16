@@ -2,9 +2,9 @@
     <string name="app_name">PolarHRServer</string>
     <string name="action_settings">Settings</string>
     <string name="connect">Connect</string>
-    <string name="disconnect">Connect</string>
+    <string name="disconnect">Disconnect</string>
     <string name="status">Status: %1$s</string>
-    <string name="hr_n_a_bpm">hr</string>
+    <string name="hr">hr: %1$s</string>
     <string name="current_ecg_value">Current ECG Value: %1$s</string>
     <string name="current_acc_value">Current ACC Value: %1$s</string>
     <string name="disconnected">Disconnected</string>

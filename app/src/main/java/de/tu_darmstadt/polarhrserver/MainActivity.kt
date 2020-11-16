@@ -4,15 +4,13 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.Menu
-import android.view.MenuItem
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.snackbar.Snackbar
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
 import polar.com.sdk.api.model.PolarAccelerometerData
 import polar.com.sdk.api.model.PolarEcgData
+import polar.com.sdk.api.model.PolarHrData
 
 
 class MainActivity : AppCompatActivity() {
@@ -34,7 +32,8 @@ class MainActivity : AppCompatActivity() {
             this::onAccData,
             this::onConnected,
             this::onDisconnected,
-            this::onConnecting
+            this::onConnecting,
+            this::onHrData
         )
 
         setContentView(R.layout.activity_main)
@@ -67,20 +66,30 @@ class MainActivity : AppCompatActivity() {
             LOG_TAG,
             "AccData: ${polarAccData.timeStamp} - (${polarAccData.samples.map { "${it.x}, ${it.y}, ${it.z} " }})"
         )
-        tv_acc_value.text = getString(
-            R.string.current_acc_value,
-            "x: ${polarAccData.samples.last().x}, y: ${polarAccData.samples.last().y}, z: ${polarAccData.samples.last().z}"
-        )
+        runOnUiThread {
+            tv_acc_value.text = getString(
+                R.string.current_acc_value,
+                "x: ${polarAccData.samples.last().x}, y: ${polarAccData.samples.last().y}, z: ${polarAccData.samples.last().z}"
+            )
+        }
+
         //TODO: send to client
     }
 
     private fun onEcgData(ecgData: PolarEcgData) {
         Log.d(LOG_TAG, "ECG Data: ${ecgData.timeStamp} - (${ecgData.samples})")
-        tv_acc_value.text = getString(
-            R.string.current_acc_value,
-            "x: ${ecgData.samples.last()}"
-        )
+        runOnUiThread {
+            tv_ecg_value.text = getString(
+                R.string.current_acc_value,
+                "x: ${ecgData.samples.last()}"
+            )
+        }
+
         //TODO: send to client
+    }
+
+    private fun onHrData(hrData: PolarHrData) {
+        tv_hr.text = getString(R.string.hr, hrData.hr.toString());
     }
 
     override fun onPause() {
