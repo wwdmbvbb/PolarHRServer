@@ -1,38 +1,109 @@
 package de.tu_darmstadt.polarhrserver
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
-import com.google.android.material.snackbar.Snackbar
-import androidx.appcompat.app.AppCompatActivity;
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
-
+import android.view.View
+import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.android.synthetic.main.content_main.*
+import polar.com.sdk.api.model.PolarAccelerometerData
+import polar.com.sdk.api.model.PolarEcgData
+
+
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            requestPermissions(
+                arrayOf(
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ), 1
+            )
+        }
+
+        PolarDatReceiver.init(
+            this::onEcgData,
+            this::onAccData,
+            this::onConnected,
+            this::onDisconnected,
+            this::onConnecting
+        )
+
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
-
-        fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                    .setAction("Action", null).show()
-        }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        menuInflater.inflate(R.menu.menu_main, menu)
-        return true
+    fun onConnectClicked(view: View) {
+        PolarDatReceiver.connect(this)
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        return when(item.itemId) {
-            R.id.action_settings -> true
-            else -> super.onOptionsItemSelected(item)
-        }
+    private fun onConnected(id: String) {
+        tv_status.text = getString(R.string.status, getString(R.string.connected))
+        btn_connect.text = getString(R.string.disconnect)
+        btn_connect.isEnabled = true
+    }
+
+    private fun onDisconnected(id: String) {
+        tv_status.text = getString(R.string.status, getString(R.string.disconnect))
+        btn_connect.text = getString(R.string.connect)
+        btn_connect.isEnabled = true
+    }
+
+    private fun onConnecting(id: String) {
+        tv_status.text = getString(R.string.connecting)
+        btn_connect.isEnabled = false
+    }
+
+    private fun onAccData(polarAccData: PolarAccelerometerData) {
+        Log.d(
+            LOG_TAG,
+            "AccData: ${polarAccData.timeStamp} - (${polarAccData.samples.map { "${it.x}, ${it.y}, ${it.z} " }})"
+        )
+        tv_acc_value.text = getString(
+            R.string.current_acc_value,
+            "x: ${polarAccData.samples.last().x}, y: ${polarAccData.samples.last().y}, z: ${polarAccData.samples.last().z}"
+        )
+        //TODO: send to client
+    }
+
+    private fun onEcgData(ecgData: PolarEcgData) {
+        Log.d(LOG_TAG, "ECG Data: ${ecgData.timeStamp} - (${ecgData.samples})")
+        tv_acc_value.text = getString(
+            R.string.current_acc_value,
+            "x: ${ecgData.samples.last()}"
+        )
+        //TODO: send to client
+    }
+
+    override fun onPause() {
+        PolarDatReceiver.onPause()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        PolarDatReceiver.onResume()
+        super.onResume()
+    }
+
+    override fun onStop() {
+        PolarDatReceiver.dispose()
+        super.onStop()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        Log.d(LOG_TAG, "permission result: $grantResults")
     }
 }
