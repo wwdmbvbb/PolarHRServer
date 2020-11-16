@@ -6,15 +6,25 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import io.ktor.network.selector.*
+import io.ktor.network.sockets.*
+import io.ktor.util.*
+import io.ktor.utils.io.core.*
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
+import kotlinx.coroutines.*
 import polar.com.sdk.api.model.PolarAccelerometerData
 import polar.com.sdk.api.model.PolarEcgData
 import polar.com.sdk.api.model.PolarHrData
+import java.net.InetSocketAddress
 
 
 class MainActivity : AppCompatActivity() {
 
+    @KtorExperimentalAPI
+    var dataTransfer: DataTransfer? = null
+
+    @KtorExperimentalAPI
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -44,6 +54,29 @@ class MainActivity : AppCompatActivity() {
         PolarDatReceiver.connect(this)
     }
 
+    @KtorExperimentalAPI
+    fun onSendDataClicked(view: View) = GlobalScope.launch {
+        try {
+            val ip = et_server.text.toString()
+            val port = et_server_port.text.toString().toInt()
+
+            if (dataTransfer == null) {
+                dataTransfer = DataTransfer(ip, port)
+                runOnUiThread {
+                    btn_send_data.text = getString(R.string.stop_sending_data)
+                }
+            } else {
+                dataTransfer?.dispose()
+                dataTransfer = null
+                runOnUiThread {
+                    btn_send_data.text = getString(R.string.start_sending_data)
+                }
+            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+    }
+
     private fun onConnected(id: String) {
         tv_status.text = getString(R.string.status, getString(R.string.connected))
         btn_connect.text = getString(R.string.disconnect)
@@ -61,6 +94,7 @@ class MainActivity : AppCompatActivity() {
         btn_connect.isEnabled = false
     }
 
+    @KtorExperimentalAPI
     private fun onAccData(polarAccData: PolarAccelerometerData) {
         Log.d(
             LOG_TAG,
@@ -73,9 +107,12 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        //TODO: send to client
+        GlobalScope.launch {
+            dataTransfer?.sendAccData(polarAccData)
+        }
     }
 
+    @KtorExperimentalAPI
     private fun onEcgData(ecgData: PolarEcgData) {
         Log.d(LOG_TAG, "ECG Data: ${ecgData.timeStamp} - (${ecgData.samples})")
         runOnUiThread {
@@ -85,11 +122,17 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        //TODO: send to client
+        GlobalScope.launch {
+            dataTransfer?.sendEcgData(ecgData)
+        }
     }
 
+    @KtorExperimentalAPI
     private fun onHrData(hrData: PolarHrData) {
         tv_hr.text = getString(R.string.hr, hrData.hr.toString());
+        GlobalScope.launch {
+            dataTransfer?.sendHrData(hrData)
+        }
     }
 
     override fun onPause() {
@@ -115,4 +158,5 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         Log.d(LOG_TAG, "permission result: $grantResults")
     }
+
 }
