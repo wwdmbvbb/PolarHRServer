@@ -24,13 +24,18 @@ object PolarDatReceiver {
     private var onDisconnected: ((String) -> Unit)? = null
     private var onConnecting: ((String) -> Unit)? = null
 
+    private var onSelectAccSettings: ((PolarSensorSetting) -> PolarSensorSetting)? = null
+    private var onSelectEcgSettings: ((PolarSensorSetting) -> PolarSensorSetting)? = null
+
     fun init(
         onEcgData: (PolarEcgData) -> Unit,
         onAccData: (PolarAccelerometerData) -> Unit,
         onConnected: (String) -> Unit,
         onDisconnected: (String) -> Unit,
         onConnecting: (String) -> Unit,
-        onHrData: (PolarHrData) -> Unit
+        onHrData: (PolarHrData) -> Unit,
+        onSelectAccSettings: ((PolarSensorSetting) -> PolarSensorSetting),
+        onSelectEcgSettings: ((PolarSensorSetting) -> PolarSensorSetting)
     ) {
         this.onEcgData = onEcgData
         this.onAccData = onAccData
@@ -38,6 +43,8 @@ object PolarDatReceiver {
         this.onDisconnected = onDisconnected
         this.onConnecting = onConnecting
         this.onHrData = onHrData
+        this.onSelectAccSettings = onSelectAccSettings
+        this.onSelectEcgSettings = onSelectEcgSettings
     }
 
     fun connect(context: Context) {
@@ -67,25 +74,31 @@ object PolarDatReceiver {
 
     private fun onEcgReady(identifier: String) {
         if (api == null) return;
-        val ecgSettings = api!!.requestEcgSettings(DEVICE_ID).blockingGet().maxSettings(); //TODO: let user choose
+        val ecgSettingsSelection = api!!.requestEcgSettings(DEVICE_ID).blockingGet();
+        val ecgSettings =
+            if (onSelectEcgSettings != null) onSelectEcgSettings!!(ecgSettingsSelection) else ecgSettingsSelection.maxSettings()
         val ecgFlowable = api!!.startEcgStreaming(identifier, ecgSettings)
         if (onEcgData != null) {
             ecgSubscription = ecgFlowable.subscribe(
                 onEcgData,
                 { //Log.e(LOG_TAG, "Error while receiving ECG: ${it}")
-                    throw it }) //TODO: onError
+                    throw it
+                }) //TODO: onError
         }
     }
 
     private fun onAccReady(identifier: String) {
         if (api == null) return;
-        val accSettings = api!!.requestAccSettings(DEVICE_ID).blockingGet().maxSettings(); //TODO: let user choose
+        val accSettingsSelection = api!!.requestAccSettings(DEVICE_ID).blockingGet()
+        val accSettings =
+            if (onSelectAccSettings != null) onSelectAccSettings!!(accSettingsSelection) else accSettingsSelection.maxSettings()
         val accFlowable = api!!.startAccStreaming(identifier, accSettings)
         if (onAccData != null) {
             accSubscription = accFlowable.subscribe(
                 onAccData,
                 { //Log.e(LOG_TAG, "Error while receiving ACC: ${it}")
-                    throw it }) //TODO: onError
+                    throw it
+                }) //TODO: onError
         }
     }
 

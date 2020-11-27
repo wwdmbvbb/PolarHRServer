@@ -1,0 +1,44 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="@string/ecgSensorTitle">
+
+
+        <ListPreference
+                app:isPreferenceVisible="true"
+                app:key="ECG_RESOLUTION"
+                app:title="@string/resolution"
+                app:entries="@array/reply_entries"
+                app:entryValues="@array/reply_values"
+                app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
+                app:isPreferenceVisible="true"
+                app:key="ECG_SAMPLE_RATE"
+                app:title="@string/sample_rate"
+                app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/accSensorTitle">
+
+        <ListPreference
+                app:isPreferenceVisible="true"
+                app:key="ACC_RESOLUTION"
+                app:title="@string/resolution"
+                app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
+                app:isPreferenceVisible="true"
+                app:key="ACC_SAMPLE_RATE"
+                app:title="@string/sample_rate"
+                app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
+                app:isPreferenceVisible="true"
+                app:key="ACC_RANGE"
+                app:title="@string/range"
+                app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

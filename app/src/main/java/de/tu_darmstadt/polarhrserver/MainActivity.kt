@@ -1,32 +1,48 @@
 package de.tu_darmstadt.polarhrserver
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.preference.PreferenceManager
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
+import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
-import io.ktor.network.selector.*
-import io.ktor.network.sockets.*
 import io.ktor.util.*
-import io.ktor.utils.io.core.*
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import polar.com.sdk.api.model.PolarAccelerometerData
 import polar.com.sdk.api.model.PolarEcgData
 import polar.com.sdk.api.model.PolarHrData
-import java.net.InetSocketAddress
+import polar.com.sdk.api.model.PolarSensorSetting
 
+
+private const val PREVIOUS_CONNECTIONS_KEY = "previous_connections";
+private const val CLEAN_PREFS = false;
 
 class MainActivity : AppCompatActivity() {
 
     @KtorExperimentalAPI
     var dataTransfer: DataTransfer? = null
 
+    private var previousConnectionsList = listOf<ConnectionData>();
+
     @KtorExperimentalAPI
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (CLEAN_PREFS) {
+            val settings = PreferenceManager.getDefaultSharedPreferences(this);
+            val editor = settings.edit()
+            editor.clear()
+            editor.apply()
+        }
+
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             requestPermissions(
@@ -37,17 +53,113 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         PolarDatReceiver.init(
             this::onEcgData,
             this::onAccData,
             this::onConnected,
             this::onDisconnected,
             this::onConnecting,
-            this::onHrData
+            this::onHrData,
+            this::onInitAccSettings,
+            this::onInitEcgSettings,
         )
 
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
+
+        fillPreviousConnections(init = true)
+    }
+
+    private fun onInitAccSettings(settingsChoice: PolarSensorSetting): PolarSensorSetting =
+        onInitPolarSettings(settingsChoice, "ACC")
+
+
+    private fun onInitEcgSettings(settingsChoice: PolarSensorSetting): PolarSensorSetting =
+        onInitPolarSettings(settingsChoice, "ECG")
+
+
+    private fun onInitPolarSettings(
+        settingsChoice: PolarSensorSetting,
+        name: String
+    ): PolarSensorSetting {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        val editor = prefs.edit()
+        val key = "${name}_AVAILABLE_TYPES"
+        val value: Set<String> = settingsChoice.settings.keys.map { it.toString() }.toSet()
+
+        val availableTypes = prefs.getStringSet(key, setOf())
+        if(availableTypes != value) {
+            editor.putStringSet(key, value)
+            settingsChoice.settings.forEach { type, choices ->
+                editor.putStringSet("${name}_AVAILABLE_$type", choices.map { it.toString() }.toSet())
+            }
+            editor.apply()
+        }else{
+            val settings = mutableMapOf<PolarSensorSetting.SettingType, Int>()
+
+            settingsChoice.settings.forEach { type, choices ->
+                settings[type] = prefs.getString("${name}_${type}", null)?.toIntOrNull() ?: -1
+            }
+
+            if(!settings.values.contains(-1)){
+                return PolarSensorSetting(settings)
+            }
+        }
+
+        return settingsChoice.maxSettings()
+    }
+
+
+    @KtorExperimentalAPI
+    private fun fillPreviousConnections(init: Boolean = false) {
+        val settings = PreferenceManager.getDefaultSharedPreferences(this)
+        val previousConnections = settings.getString(PREVIOUS_CONNECTIONS_KEY, null)?.split(";");
+
+        if (previousConnections.isNullOrEmpty()) return;
+
+        previousConnectionsList = previousConnections.map {
+            val parts = it.split(":")
+            if (parts.size < 2) throw IllegalArgumentException("IP Address has to have Format address:port")
+
+            ConnectionData(
+                it
+            ) { view ->
+                et_server.setText(parts[0])
+                et_server_port.setText(parts[1])
+                onSendDataClicked(view)
+            }
+        }
+
+        if (init) {
+            list_previous_connections.adapter = PreviousConnectionsListAdapter(
+                previousConnectionsList,
+                layoutInflater
+            )
+        } else {
+            val adapter = list_previous_connections.adapter as PreviousConnectionsListAdapter
+            adapter.data = previousConnectionsList;
+        }
+
+    }
+
+    private fun saveConnection(ip: String, port: Int) {
+        val settings = PreferenceManager.getDefaultSharedPreferences(this)
+        val previousConnections =
+            settings.getString(PREVIOUS_CONNECTIONS_KEY, null)?.split(";") ?: listOf()
+
+        val newConnectionList = previousConnections.toMutableList()
+        val newElement = "$ip:$port";
+        newConnectionList.remove(newElement)
+        newConnectionList.add(0, newElement);
+        while (newConnectionList.size > 5) {
+            newConnectionList.removeLast()
+        }
+
+        val editor = settings.edit()
+        editor.putString(PREVIOUS_CONNECTIONS_KEY, newConnectionList.joinToString(";"))
+        editor.apply()
     }
 
     fun onConnectClicked(view: View) {
@@ -72,6 +184,10 @@ class MainActivity : AppCompatActivity() {
                     btn_send_data.text = getString(R.string.start_sending_data)
                 }
             }
+
+            saveConnection(ip, port)
+            fillPreviousConnections()
+
         } catch (e: Throwable) {
             e.printStackTrace()
         }
@@ -157,6 +273,25 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         Log.d(LOG_TAG, "permission result: $grantResults")
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem?): Boolean = when (item?.itemId) {
+        R.id.action_settings -> {
+            val intent = Intent(this, SettingsActivity::class.java).apply {
+                // putExtra(EXTRA_MESSAGE, message)
+                // flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            startActivity(intent)
+            true
+        }
+        else -> {
+            super.onOptionsItemSelected(item)
+        }
     }
 
 }
