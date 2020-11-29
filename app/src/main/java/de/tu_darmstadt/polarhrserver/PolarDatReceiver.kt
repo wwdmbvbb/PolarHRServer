@@ -4,11 +4,9 @@ import android.content.Context
 import android.util.Log
 import io.reactivex.rxjava3.disposables.Disposable
 import polar.com.sdk.api.PolarBleApi
-import polar.com.sdk.api.PolarBleApiCallbackProvider
 import polar.com.sdk.api.PolarBleApiDefaultImpl
 import polar.com.sdk.api.model.*
 import java.lang.Exception
-import kotlin.reflect.KFunction0
 
 object PolarDatReceiver {
     private var api: PolarBleApi? = null
@@ -26,6 +24,9 @@ object PolarDatReceiver {
 
     private var onSelectAccSettings: ((PolarSensorSetting) -> PolarSensorSetting)? = null
     private var onSelectEcgSettings: ((PolarSensorSetting) -> PolarSensorSetting)? = null
+
+    private var firstEcgTimestamp: Long? = null
+    private var firstAccTimetamp: Long? = null
 
     fun init(
         onEcgData: (PolarEcgData) -> Unit,
@@ -78,13 +79,27 @@ object PolarDatReceiver {
         val ecgSettings =
             if (onSelectEcgSettings != null) onSelectEcgSettings!!(ecgSettingsSelection) else ecgSettingsSelection.maxSettings()
         val ecgFlowable = api!!.startEcgStreaming(identifier, ecgSettings)
-        if (onEcgData != null) {
-            ecgSubscription = ecgFlowable.subscribe(
-                onEcgData,
-                { //Log.e(LOG_TAG, "Error while receiving ECG: ${it}")
-                    throw it
-                }) //TODO: onError
+        ecgSubscription = ecgFlowable.subscribe(
+            this::onEcgData
+        ) { //Log.e(LOG_TAG, "Error while receiving ECG: ${it}")
+            throw it
+        } //TODO: onError
+    }
+
+    private fun onAccData(data: PolarAccelerometerData) {
+        if (firstAccTimetamp == null) {
+            firstAccTimetamp = data.timeStamp
         }
+        data.timeStamp -= firstAccTimetamp!!;
+        onAccData?.let { it(data) }
+    }
+
+    private fun onEcgData(data: PolarEcgData) {
+        if (firstEcgTimestamp == null) {
+            firstEcgTimestamp = data.timeStamp
+        }
+        data.timeStamp -= firstEcgTimestamp!!;
+        onEcgData?.let { it(data) }
     }
 
     private fun onAccReady(identifier: String) {
@@ -93,13 +108,11 @@ object PolarDatReceiver {
         val accSettings =
             if (onSelectAccSettings != null) onSelectAccSettings!!(accSettingsSelection) else accSettingsSelection.maxSettings()
         val accFlowable = api!!.startAccStreaming(identifier, accSettings)
-        if (onAccData != null) {
-            accSubscription = accFlowable.subscribe(
-                onAccData,
-                { //Log.e(LOG_TAG, "Error while receiving ACC: ${it}")
-                    throw it
-                }) //TODO: onError
-        }
+        accSubscription = accFlowable.subscribe(
+            this::onAccData
+        ) { //Log.e(LOG_TAG, "Error while receiving ACC: ${it}")
+            throw it
+        } //TODO: onError
     }
 
     private fun onHrReceived(identifier: String, data: PolarHrData) {
