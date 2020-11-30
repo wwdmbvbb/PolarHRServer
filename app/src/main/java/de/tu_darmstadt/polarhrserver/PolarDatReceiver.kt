@@ -53,6 +53,7 @@ object PolarDatReceiver {
             context,
             PolarBleApi.FEATURE_HR or PolarBleApi.FEATURE_POLAR_SENSOR_STREAMING
         )
+        api?.setMtu(70)
         api?.setApiCallback(
             CustomPolarApiCallback(
                 this::onEcgReady,
