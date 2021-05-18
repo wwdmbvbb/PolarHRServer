@@ -1,8 +1,10 @@
 package de.tu_darmstadt.polarhrserver
 
+import PowermeterSearch
 import android.Manifest
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.util.Log
@@ -11,6 +13,9 @@ import android.view.MenuItem
 import android.view.View
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
+import de.tu_darmstadt.polarhrserver.powermeter.PowermeterData
+import de.tu_darmstadt.polarhrserver.powermeter.PowermeterGattCallback
+import de.tu_darmstadt.polarhrserver.powermeter.PowermeterGattManager
 import io.ktor.util.*
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
@@ -24,6 +29,7 @@ import polar.com.sdk.api.model.PolarSensorSetting
 
 private const val PREVIOUS_CONNECTIONS_KEY = "previous_connections";
 private const val CLEAN_PREFS = false;
+private const val POWERMETER_NAME = "Stages 21218";
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,6 +37,8 @@ class MainActivity : AppCompatActivity() {
     var dataTransfer: DataTransfer? = null
 
     private var previousConnectionsList = listOf<ConnectionData>();
+
+    private lateinit var powermeterSearch: PowermeterSearch
 
     @KtorExperimentalAPI
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,14 +52,12 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            requestPermissions(
-                arrayOf(
-                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ), 1
-            )
-        }
+        requestPermissions(
+            arrayOf(
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ), 1
+        )
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
@@ -70,6 +76,8 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
 
         fillPreviousConnections(init = true)
+
+        powermeterSearch = PowermeterSearch(getSystemService(BluetoothManager::class.java), POWERMETER_NAME, this::onPowermeterFound)
     }
 
     private fun onInitAccSettings(settingsChoice: PolarSensorSetting): PolarSensorSetting =
@@ -90,20 +98,23 @@ class MainActivity : AppCompatActivity() {
         val value: Set<String> = settingsChoice.settings.keys.map { it.toString() }.toSet()
 
         val availableTypes = prefs.getStringSet(key, setOf())
-        if(availableTypes != value) {
+        if (availableTypes != value) {
             editor.putStringSet(key, value)
             settingsChoice.settings.forEach { type, choices ->
-                editor.putStringSet("${name}_AVAILABLE_$type", choices.map { it.toString() }.toSet())
+                editor.putStringSet(
+                    "${name}_AVAILABLE_$type",
+                    choices.map { it.toString() }.toSet()
+                )
             }
             editor.apply()
-        }else{
+        } else {
             val settings = mutableMapOf<PolarSensorSetting.SettingType, Int>()
 
             settingsChoice.settings.forEach { type, choices ->
                 settings[type] = prefs.getString("${name}_${type}", null)?.toIntOrNull() ?: -1
             }
 
-            if(!settings.values.contains(-1)){
+            if (!settings.values.contains(-1)) {
                 return PolarSensorSetting(settings)
             }
         }
@@ -165,6 +176,35 @@ class MainActivity : AppCompatActivity() {
     fun onConnectClicked(view: View) {
         PolarDatReceiver.connect(this)
     }
+
+    fun onPowermeterConnectClicked(view: View) {
+        powermeterSearch.scanDevices();
+    }
+
+    private fun onPowermeterFound(device: BluetoothDevice){
+        val gatt = device.connectGatt(applicationContext, true, PowermeterGattCallback(this::onPowermeterData))
+        val gattManager = PowermeterGattManager(gatt)
+    }
+
+    @KtorExperimentalAPI
+    private fun onPowermeterData(data: PowermeterData){
+        //TODO UI
+        /*Log.d(
+            LOG_TAG,
+            "AccData: ${polarAccData.timeStamp} - (${polarAccData.samples.map { "${it.x}, ${it.y}, ${it.z} " }})"
+        )
+        runOnUiThread {
+            tv_acc_value.text = getString(
+                R.string.current_acc_value,
+                "x: ${polarAccData.samples.last().x}, y: ${polarAccData.samples.last().y}, z: ${polarAccData.samples.last().z}"
+            )
+        }*/
+
+        GlobalScope.launch {
+            dataTransfer?.sendPowermeterData(data)
+        }
+    }
+
 
     @KtorExperimentalAPI
     fun onSendDataClicked(view: View) = GlobalScope.launch {

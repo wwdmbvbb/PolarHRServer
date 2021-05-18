@@ -40,4 +40,5 @@
     <string name="resolution">Resolution</string>
     <string name="range">Range</string>
     <string name="use">Use</string>
+    <string name="connect_pm">Connect PM</string>
 </resources>

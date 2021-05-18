@@ -2,6 +2,7 @@ package de.tu_darmstadt.polarhrserver
 
 import android.util.Log
 import com.androidcommunications.polar.api.ble.model.gatt.client.BlePMDClient
+import de.tu_darmstadt.polarhrserver.powermeter.PowermeterData
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.util.*
@@ -60,6 +61,16 @@ class DataTransfer(private val serverAddress: String, private val serverPort: In
         try {
             val buf = BytePacketBuilder();
             buf.writeText(hrData.toUdpString());
+            socket.outgoing.send(Datagram(buf.build(), destAddr))
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+    }
+
+    suspend fun sendPowermeterData(data: PowermeterData){
+        try {
+            val buf = BytePacketBuilder();
+            buf.writeText(data.toUdpString());
             socket.outgoing.send(Datagram(buf.build(), destAddr))
         } catch (e: Throwable) {
             e.printStackTrace()
