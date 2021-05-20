@@ -41,4 +41,10 @@
     <string name="range">Range</string>
     <string name="use">Use</string>
     <string name="connect_pm">Connect PM</string>
+    <string name="disconnect_pm">Disconnect PM</string>
+    <string name="pm_status">PM status: %1$s</string>
+    <string name="power">Power: %1$s</string>
+    <string name="torque">Torque: %1$s</string>
+    <string name="revs">Revs: %1$s</string>
+    <string name="last_rev_time">Last Rev: %1$s</string>
 </resources>

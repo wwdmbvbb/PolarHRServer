@@ -23,7 +23,11 @@ data class PowermeterData(
     val lastCrankEventTime: Float
 ) {
     fun toUdpString(): String {
-        return "POW:p=$instantaneousPower;t=$accumulatedTorque;cr=$crankRevolutions;ce=$lastCrankEventTime"
+        return "POW:$instantaneousPower;$accumulatedTorque;$crankRevolutions;$lastCrankEventTime"
+    }
+
+    override fun toString(): String {
+        return "PowermeterData(instantaneousPower=$instantaneousPower, accumulatedTorque=$accumulatedTorque, crankRevolutions=$crankRevolutions, lastCrankEventTime=$lastCrankEventTime)"
     }
 }
 
@@ -139,11 +143,7 @@ class PowermeterGattCallback(val onPowermeterData: (data: PowermeterData) -> Uni
     private fun onCyclingPowerMeasurementCharacteristicsChanged(c: BluetoothGattCharacteristic) {
         // For all other profiles, writes the data formatted in HEX.
         val data: ByteArray = c.value
-        if (data.isNotEmpty()) {
-            val stringBuilder = StringBuilder(data.size)
-            for (byteChar in data) stringBuilder.append(String.format("%02X ", byteChar))
-            Log.d(TAG, "value: ${stringBuilder.toString()}")
-        }
+        if (data.size < 11) return;
 
         /*TODO: one could read this, but for the stages powermeter we have 00101111 00000000, which
         means we have Accumulated Torque Present and Crank Revolution Data Present. The rest is not
@@ -151,10 +151,11 @@ class PowermeterGattCallback(val onPowermeterData: (data: PowermeterData) -> Uni
         val flags = c.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 0)
         val instantaneousPower = c.getIntValue(BluetoothGattCharacteristic.FORMAT_SINT16, 2) //Watt
         val accumulatedTorque =
-            c.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 4) //(1/32) Nm
-        val cumulativeCrankRevs = c.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 6) //#
+            c.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 5) //(1/32) Nm
+        val cumulativeCrankRevs = c.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 7) //#
         val lastCrankEventTime =
-            c.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 8) // (1/1024) seconds
+            c.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 9) // (1/1024) seconds
+
         onPowermeterData(
             PowermeterData(
                 instantaneousPower,

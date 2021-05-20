@@ -3,6 +3,7 @@ package de.tu_darmstadt.polarhrserver
 import PowermeterSearch
 import android.Manifest
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothManager
 import android.content.Intent
 import android.os.Bundle
@@ -15,7 +16,6 @@ import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import de.tu_darmstadt.polarhrserver.powermeter.PowermeterData
 import de.tu_darmstadt.polarhrserver.powermeter.PowermeterGattCallback
-import de.tu_darmstadt.polarhrserver.powermeter.PowermeterGattManager
 import io.ktor.util.*
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
@@ -39,6 +39,8 @@ class MainActivity : AppCompatActivity() {
     private var previousConnectionsList = listOf<ConnectionData>();
 
     private lateinit var powermeterSearch: PowermeterSearch
+
+    private var gatt: BluetoothGatt? = null
 
     @KtorExperimentalAPI
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,7 +79,12 @@ class MainActivity : AppCompatActivity() {
 
         fillPreviousConnections(init = true)
 
-        powermeterSearch = PowermeterSearch(getSystemService(BluetoothManager::class.java), POWERMETER_NAME, this::onPowermeterFound)
+        powermeterSearch = PowermeterSearch(
+            getSystemService(BluetoothManager::class.java),
+            POWERMETER_NAME,
+            this::onPowermeterFound,
+            this::onPowermeterScanStopped
+        )
     }
 
     private fun onInitAccSettings(settingsChoice: PolarSensorSetting): PolarSensorSetting =
@@ -178,27 +185,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun onPowermeterConnectClicked(view: View) {
+        tv_status_pm.text = getString(R.string.pm_status, getString(R.string.connecting))
+        tv_status_pm.isEnabled = false;
         powermeterSearch.scanDevices();
     }
 
-    private fun onPowermeterFound(device: BluetoothDevice){
-        val gatt = device.connectGatt(applicationContext, true, PowermeterGattCallback(this::onPowermeterData))
-        val gattManager = PowermeterGattManager(gatt)
+    private fun onPowermeterFound(device: BluetoothDevice) {
+        tv_status_pm.isEnabled = true;
+        tv_status_pm.text = getString(R.string.pm_status, getString(R.string.connected))
+        btn_connect_powermeter.text = getString(R.string.disconnect)
+        gatt = device.connectGatt(
+            applicationContext,
+            true,
+            PowermeterGattCallback(this::onPowermeterData)
+        )
+    }
+
+    private fun onPowermeterScanStopped() {
+        tv_status_pm.isEnabled = true;
+        tv_status_pm.text = getString(R.string.pm_status, getString(R.string.disconnected))
     }
 
     @KtorExperimentalAPI
-    private fun onPowermeterData(data: PowermeterData){
-        //TODO UI
-        /*Log.d(
-            LOG_TAG,
-            "AccData: ${polarAccData.timeStamp} - (${polarAccData.samples.map { "${it.x}, ${it.y}, ${it.z} " }})"
-        )
-        runOnUiThread {
-            tv_acc_value.text = getString(
-                R.string.current_acc_value,
-                "x: ${polarAccData.samples.last().x}, y: ${polarAccData.samples.last().y}, z: ${polarAccData.samples.last().z}"
-            )
-        }*/
+    private fun onPowermeterData(data: PowermeterData) {
+        Log.d(LOG_TAG, "Got powermeter data: $data")
+        tv_power.text = getString(R.string.power, data.instantaneousPower.toString())
+        tv_torque.text = getString(R.string.torque, data.accumulatedTorque.toString())
+        tv_revs.text = getString(R.string.revs, data.crankRevolutions.toString())
+        tv_last_rev.text = getString(R.string.last_rev_time, data.lastCrankEventTime.toString())
 
         GlobalScope.launch {
             dataTransfer?.sendPowermeterData(data)
@@ -291,17 +305,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun disconnectAndCloseGatt() {
+        gatt?.disconnect()
+        btn_connect_powermeter.text = getString(R.string.connect)
+        gatt?.close()
+    }
+
     override fun onPause() {
         PolarDatReceiver.onPause()
+        gatt?.disconnect()
         super.onPause()
     }
 
     override fun onResume() {
+        gatt?.connect()
         PolarDatReceiver.onResume()
         super.onResume()
     }
 
     override fun onStop() {
+        disconnectAndCloseGatt()
         PolarDatReceiver.dispose()
         super.onStop()
     }

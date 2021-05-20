@@ -8,12 +8,12 @@ import android.os.Build
 import android.os.Handler
 import android.util.Log
 import androidx.annotation.RequiresApi
-import androidx.core.content.ContextCompat.getSystemService
 
 class PowermeterSearch(
     private val bluetoothManager: BluetoothManager?,
     private val name: String,
-    private val onPowermeterFound: (device: BluetoothDevice) -> Unit
+    private val onPowermeterFound: (device: BluetoothDevice) -> Unit,
+    private val onScanStopped: () -> Unit
 ) {
 
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager?.adapter;
@@ -46,12 +46,14 @@ class PowermeterSearch(
                 handler.postDelayed({
                     scanning = false
                     scanner.stopScan(leScanCallback)
+                    onScanStopped();
                 }, SCAN_PERIOD)
                 scanning = true
                 scanner.startScan(leScanCallback)
             } else {
                 scanning = false
                 scanner.stopScan(leScanCallback)
+                onScanStopped()
             }
         }
     }

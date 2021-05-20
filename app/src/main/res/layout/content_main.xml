@@ -8,11 +8,36 @@
         tools:showIn="@layout/activity_main"
         tools:context=".MainActivity">
 
+    <androidx.constraintlayout.helper.widget.Flow
+            android:id="@+id/flow1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/flow2"
+            app:layout_constraintTop_toTopOf="parent"
+            app:flow_wrapMode="aligned"
+            app:layout_constraintWidth_percent="0.42"
+            app:flow_verticalGap="4dp"
+            android:layout_marginTop="4dp"
+
+            app:constraint_referenced_ids="tv_status,tv_hr,tv_ecg_value,tv_acc_value,btn_connect" />
+
+    <androidx.constraintlayout.helper.widget.Flow
+            android:id="@+id/flow2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintStart_toEndOf="@id/flow1"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:flow_wrapMode="aligned"
+            app:layout_constraintWidth_percent="0.42"
+            android:layout_marginTop="4dp"
+            app:flow_verticalGap="4dp"
+
+            app:constraint_referenced_ids="tv_status_pm, tv_power, tv_torque, tv_revs, tv_last_rev, btn_connect_powermeter" />
+
     <TextView
             android:id="@+id/tv_status"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
             android:text="@string/status"
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"
@@ -20,9 +45,6 @@
 
     <TextView
             android:id="@+id/tv_hr"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tv_status"
             android:text="@string/hr"
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"
@@ -30,9 +52,6 @@
 
     <TextView
             android:id="@+id/tv_ecg_value"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tv_hr"
             android:text="@string/current_ecg_value"
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"
@@ -40,9 +59,6 @@
 
     <TextView
             android:id="@+id/tv_acc_value"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tv_ecg_value"
             android:text="@string/current_acc_value"
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"
@@ -50,13 +66,46 @@
 
     <Button
             android:id="@+id/btn_connect"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tv_acc_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/connect"
             android:layout_margin="8dp"
             android:onClick="onConnectClicked" />
+
+    <TextView
+            android:id="@+id/tv_status_pm"
+            android:text="@string/pm_status"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_margin="8dp" />
+
+    <TextView
+            android:id="@+id/tv_power"
+            android:text="@string/power"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_margin="8dp" />
+
+    <TextView
+            android:id="@+id/tv_torque"
+            android:text="@string/torque"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_margin="8dp" />
+
+    <TextView
+            android:id="@+id/tv_revs"
+            android:text="@string/revs"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_margin="8dp" />
+
+    <TextView
+            android:id="@+id/tv_last_rev"
+            android:text="@string/last_rev_time"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_margin="8dp" />
 
     <Button
             android:id="@+id/btn_connect_powermeter"
